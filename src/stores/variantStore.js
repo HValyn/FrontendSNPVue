@@ -2,13 +2,41 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useVariantStore = defineStore('variant', () => {
-  // --- State ---
+  // --- Core State ---
   const variants = ref([])       
   const missing = ref([])        
   const loading = ref(false)     
   const progress = ref(0)        
-  const chatHistory = ref([])    
   const totalProcessed = ref(0)
+  
+  // --- Legacy Chat State (kept for backwards compatibility) ---
+  const chatHistory = ref([])
+  
+  // --- NEW: Multi-context Chat State ---
+  const chatContexts = ref({
+    all: {
+      variants: [],
+      history: [],
+      label: 'All Variants'
+    },
+    pathogenic: {
+      variants: [],
+      history: [],
+      label: 'Pathogenic'
+    },
+    missing: {
+      variants: [],
+      history: [],
+      label: 'Missing Data'
+    },
+    custom: {
+      variants: [],
+      history: [],
+      label: 'Custom Filter'
+    }
+  })
+
+  const activeContext = ref('all')
   
   // --- Actions ---
   function clearResults() {
@@ -17,14 +45,40 @@ export const useVariantStore = defineStore('variant', () => {
     progress.value = 0
     totalProcessed.value = 0
     chatHistory.value = []
+    
+    // Clear all context histories but keep structure
+    Object.keys(chatContexts.value).forEach(key => {
+      chatContexts.value[key].variants = []
+      chatContexts.value[key].history = []
+    })
   }
 
-  // NEW: Process in Batches
+  // NEW: Update chat contexts after variants change
+  function updateChatContexts() {
+    // All context = all variants
+    chatContexts.value.all.variants = variants.value
+    
+    // Pathogenic context = ClinVar pathogenic/likely pathogenic
+    chatContexts.value.pathogenic.variants = variants.value.filter(v => {
+      const sig = v.payload?.data?.clinvar?.ucscNotes || ''
+      const sigLower = sig.toLowerCase()
+      return sigLower.includes('pathogenic') && !sigLower.includes('benign')
+    })
+    
+    // Missing context = variants with incomplete database coverage
+    chatContexts.value.missing.variants = variants.value.filter(v => {
+      const sources = v.payload?.sources_found || []
+      return sources.length < 3  // Missing at least one database
+    })
+    
+    // Custom context managed by FilterPanel - don't auto-populate
+  }
+
+  // Process variants in chunks to avoid timeouts
   async function analyzeVariants(allIds) {
     clearResults()
     loading.value = true
     
-    // Config: Chunk size of 200 prevents timeouts and UI freeze
     const CHUNK_SIZE = 200 
     const total = allIds.length
     
@@ -34,18 +88,19 @@ export const useVariantStore = defineStore('variant', () => {
       try {
         await processChunk(chunk)
         
-        // Update global progress
         totalProcessed.value += chunk.length
         progress.value = Math.min(100, Math.round((totalProcessed.value / total) * 100))
         
       } catch (err) {
         console.error(`Error processing chunk ${i}-${i+CHUNK_SIZE}`, err)
-        // Continue to next chunk even if one fails
       }
     }
     
     loading.value = false
     progress.value = 100
+    
+    // Update chat contexts after all variants loaded
+    updateChatContexts()
   }
 
   async function processChunk(rsIdList) {
@@ -73,7 +128,9 @@ export const useVariantStore = defineStore('variant', () => {
           try {
             const payload = JSON.parse(line.replace('data: ', ''))
             handleStreamEvent(payload)
-          } catch (e) { console.error(e) }
+          } catch (e) { 
+            console.error('Stream parse error:', e) 
+          }
         }
       }
     }
@@ -82,7 +139,7 @@ export const useVariantStore = defineStore('variant', () => {
   function handleStreamEvent(event) {
     switch (event.type) {
       case 'variant_found':
-        variants.value.push(event) 
+        variants.value.push(event)
         break
       case 'variant_missing':
         missing.value.push(event.rsid)
@@ -91,12 +148,23 @@ export const useVariantStore = defineStore('variant', () => {
   }
 
   return { 
+    // Core state
     variants, 
     missing, 
     loading, 
-    progress, 
-    chatHistory, 
+    progress,
+    totalProcessed,
+    
+    // Legacy chat (keep for now)
+    chatHistory,
+    
+    // NEW: Multi-context chat
+    chatContexts,
+    activeContext,
+    
+    // Actions
     analyzeVariants, 
-    clearResults 
+    clearResults,
+    updateChatContexts
   }
 })

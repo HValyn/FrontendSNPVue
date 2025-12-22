@@ -1,5 +1,6 @@
 <script setup>
 import SearchInput from '../components/SearchInput.vue'
+import FilterPanel from '../components/FilterPanel.vue'
 import VariantTable from '../components/VariantTable.vue'
 import ChatAssistant from '../components/ChatAssistant.vue'
 </script>
@@ -18,14 +19,14 @@ import ChatAssistant from '../components/ChatAssistant.vue'
     <!-- Main Grid Layout -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
       
-      <!-- Left Column: Search & Data (Takes up 8/12 columns) -->
+      <!-- Left Column: Search, Filter & Data (8/12 columns) -->
       <div class="lg:col-span-8 space-y-8">
         <SearchInput />
+        <FilterPanel />
         <VariantTable />
       </div>
 
-      <!-- Right Column: AI Chat (Takes up 4/12 columns) -->
-      <!-- Hidden on mobile, shown on large screens -->
+      <!-- Right Column: AI Chat (4/12 columns) -->
       <div class="lg:col-span-4">
         <ChatAssistant />
       </div>
