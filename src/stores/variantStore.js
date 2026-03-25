@@ -3,15 +3,15 @@ import { ref } from 'vue'
 
 export const useVariantStore = defineStore('variant', () => {
   // --- Core State ---
-  const variants = ref([])       
-  const missing = ref([])        
-  const loading = ref(false)     
-  const progress = ref(0)        
+  const variants = ref([])
+  const missing = ref([])
+  const loading = ref(false)
+  const progress = ref(0)
   const totalProcessed = ref(0)
-  
+
   // --- Legacy Chat State (kept for backwards compatibility) ---
   const chatHistory = ref([])
-  
+
   // --- NEW: Multi-context Chat State ---
   const chatContexts = ref({
     all: {
@@ -37,7 +37,7 @@ export const useVariantStore = defineStore('variant', () => {
   })
 
   const activeContext = ref('all')
-  
+
   // --- Actions ---
   function clearResults() {
     variants.value = []
@@ -45,7 +45,7 @@ export const useVariantStore = defineStore('variant', () => {
     progress.value = 0
     totalProcessed.value = 0
     chatHistory.value = []
-    
+
     // Clear all context histories but keep structure
     Object.keys(chatContexts.value).forEach(key => {
       chatContexts.value[key].variants = []
@@ -57,20 +57,20 @@ export const useVariantStore = defineStore('variant', () => {
   function updateChatContexts() {
     // All context = all variants
     chatContexts.value.all.variants = variants.value
-    
+
     // Pathogenic context = ClinVar pathogenic/likely pathogenic
     chatContexts.value.pathogenic.variants = variants.value.filter(v => {
       const sig = v.payload?.data?.clinvar?.ucscNotes || ''
       const sigLower = sig.toLowerCase()
       return sigLower.includes('pathogenic') && !sigLower.includes('benign')
     })
-    
+
     // Missing context = variants with incomplete database coverage
     chatContexts.value.missing.variants = variants.value.filter(v => {
       const sources = v.payload?.sources_found || []
       return sources.length < 3  // Missing at least one database
     })
-    
+
     // Custom context managed by FilterPanel - don't auto-populate
   }
 
@@ -78,27 +78,27 @@ export const useVariantStore = defineStore('variant', () => {
   async function analyzeVariants(allIds) {
     clearResults()
     loading.value = true
-    
-    const CHUNK_SIZE = 200 
+
+    const CHUNK_SIZE = 200
     const total = allIds.length
-    
+
     for (let i = 0; i < total; i += CHUNK_SIZE) {
       const chunk = allIds.slice(i, i + CHUNK_SIZE)
-      
+
       try {
         await processChunk(chunk)
-        
+
         totalProcessed.value += chunk.length
         progress.value = Math.min(100, Math.round((totalProcessed.value / total) * 100))
-        
+
       } catch (err) {
-        console.error(`Error processing chunk ${i}-${i+CHUNK_SIZE}`, err)
+        console.error(`Error processing chunk ${i}-${i + CHUNK_SIZE}`, err)
       }
     }
-    
+
     loading.value = false
     progress.value = 100
-    
+
     // Update chat contexts after all variants loaded
     updateChatContexts()
   }
@@ -117,24 +117,28 @@ export const useVariantStore = defineStore('variant', () => {
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
-      
+
       const chunk = decoder.decode(value, { stream: true })
       buffer += chunk
       const lines = buffer.split('\n\n')
-      buffer = lines.pop() 
-      
+      buffer = lines.pop()
+
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           try {
             const payload = JSON.parse(line.replace('data: ', ''))
             handleStreamEvent(payload)
-          } catch (e) { 
-            console.error('Stream parse error:', e) 
+          } catch (e) {
+            console.error('Stream parse error:', e)
           }
         }
       }
     }
   }
+
+  // --- Agentic Search State ---
+  const agenticResults = ref(null)
+  const agenticLoading = ref(false)
 
   function handleStreamEvent(event) {
     switch (event.type) {
@@ -147,24 +151,59 @@ export const useVariantStore = defineStore('variant', () => {
     }
   }
 
-  return { 
+  // --- Agentic Search Action ---
+  async function performAgenticSearch(file, query) {
+    agenticLoading.value = true
+    agenticResults.value = null
+
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('query', query)
+
+    try {
+      const response = await fetch('http://localhost:5000/api/agentic/analyze', {
+        method: 'POST',
+        body: formData
+      })
+
+      const data = await response.json()
+
+      if (data.status === 'success') {
+        agenticResults.value = data.data
+      } else {
+        throw new Error(data.message || 'Agentic search failed')
+      }
+    } catch (error) {
+      console.error('Agentic search failed:', error)
+      throw error
+    } finally {
+      agenticLoading.value = false
+    }
+  }
+
+  return {
     // Core state
-    variants, 
-    missing, 
-    loading, 
+    variants,
+    missing,
+    loading,
     progress,
     totalProcessed,
-    
+
     // Legacy chat (keep for now)
     chatHistory,
-    
+
     // NEW: Multi-context chat
     chatContexts,
     activeContext,
-    
+
+    // Agentic Search
+    agenticResults,
+    agenticLoading,
+
     // Actions
-    analyzeVariants, 
+    analyzeVariants,
     clearResults,
-    updateChatContexts
+    updateChatContexts,
+    performAgenticSearch
   }
 })
