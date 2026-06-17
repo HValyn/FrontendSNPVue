@@ -140,7 +140,7 @@ const sendMessage = async () => {
       content: 'Thinking...'
     }) - 1
 
-    const response = await fetch('http://localhost:5000/api/chat_analysis', {
+    const response = await fetch('http://172.16.48.59:5000/api/chat_analysis', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

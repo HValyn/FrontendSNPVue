@@ -112,7 +112,7 @@ const handleAgenticSearch = async () => {
           Upload CSV
         </div>
       </button>
-      <button 
+      <!-- <button 
         @click="activeTab = 'agentic'"
         :class="['flex-1 py-3 text-sm font-medium text-center transition-colors', activeTab === 'agentic' ? 'bg-white text-gen-primary border-b-2 border-gen-primary' : 'bg-slate-50 text-slate-500 hover:text-slate-700']"
       >
@@ -120,7 +120,7 @@ const handleAgenticSearch = async () => {
           <SparklesIcon class="h-4 w-4" />
           Smart Analysis
         </div>
-      </button>
+      </button> -->
     </div>
 
     <div class="p-6">

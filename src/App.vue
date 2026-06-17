@@ -29,7 +29,7 @@ const isAgentic = computed(() => route.path === '/agentic')
             >
               Overview
             </router-link>
-            <router-link 
+            <!-- <router-link 
               to="/agentic" 
               class="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2"
               :class="isAgentic ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-300 hover:text-white hover:bg-slate-800'"
@@ -38,7 +38,7 @@ const isAgentic = computed(() => route.path === '/agentic')
                 <path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM2.75 10a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 012.75 10zM15 10a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 0115 10zM4.757 4.757a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.061-1.06a.75.75 0 010-1.061zM14.182 14.182a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.061-1.06a.75.75 0 010-1.061zM4.757 15.243a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 01-1.06-1.06l1.06-1.061a.75.75 0 011.061 0zM14.182 5.818a.75.75 0 010-1.06l1.061-1.061a.75.75 0 011.06 1.06l-1.06 1.061a.75.75 0 01-1.061 0z" />
               </svg>
               Agentic View
-            </router-link>
+            </router-link> -->
           </nav>
         </div>
       </div>
