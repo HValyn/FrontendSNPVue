@@ -12,6 +12,7 @@
 ============================================================================= -->
 
 <script setup>
+import { API_BASE } from '../config.js'
 import { ref, computed, nextTick, watch } from 'vue'
 import { useVariantStore } from '../stores/variantStore'
 import {
@@ -133,34 +134,59 @@ const sendMessage = async () => {
   const context = store.activeContext
   store.chatContexts[context].history.push({ role: 'user', content: question })
 
+  // Push placeholder message and get its index
+  const aiMsgIndex = store.chatContexts[context].history.push({
+    role: 'assistant',
+    content: ''
+  }) - 1
+
   try {
     const smartContext = buildSmartContext()
-    const aiMsgIndex = store.chatContexts[context].history.push({
-      role: 'assistant',
-      content: 'Thinking...'
-    }) - 1
 
-    const response = await fetch('http://172.16.48.59:5000/api/chat_analysis', {
+    const response = await fetch(`${API_BASE}/api/chat_analysis`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         user_question:      question,
         variant_context:    smartContext,
         context_type:       context,
-        // NEW: inject the filter description so the LLM knows WHY this subset exists
-        filter_description: store.activeFilterDescription || null
+        filter_description: store.activeFilterDescription || null,
+        stream:             true   // ← tell backend to stream
       })
     })
 
-    const data = await response.json()
-    store.chatContexts[context].history[aiMsgIndex].content =
-      data.answer || "I couldn't generate a response."
+    // Read the SSE stream token by token
+    const reader  = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n\n')
+      buffer = lines.pop()  // keep incomplete chunk
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        try {
+          const event = JSON.parse(line.slice(6))
+          if (event.type === 'token') {
+            store.chatContexts[context].history[aiMsgIndex].content += event.text
+          }
+          // 'done' event — nothing extra needed
+        } catch { /* skip malformed lines */ }
+      }
+    }
+
+    // If we got nothing back, show a fallback
+    if (!store.chatContexts[context].history[aiMsgIndex].content) {
+      store.chatContexts[context].history[aiMsgIndex].content = "I couldn't generate a response."
+    }
 
   } catch (e) {
-    store.chatContexts[context].history.push({
-      role: 'assistant',
-      content: 'Error connecting to AI service.'
-    })
+    store.chatContexts[context].history[aiMsgIndex].content = 'Error connecting to AI service.'
   } finally {
     isSending.value = false
   }
@@ -273,10 +299,9 @@ const sendMessage = async () => {
         </div>
       </div>
 
-      <div
-        v-if="isSending && activeChatHistory[activeChatHistory.length - 1]?.content === 'Thinking...'"
-        class="flex justify-start animate-pulse"
-      >
+      <div v-if="isSending && activeChatHistory[activeChatHistory.length - 1]?.role === 'assistant' 
+           && !activeChatHistory[activeChatHistory.length - 1]?.content"
+        class="flex justify-start animate-pulse">
         <div class="bg-slate-200 h-8 w-12 rounded-full"></div>
       </div>
     </div>

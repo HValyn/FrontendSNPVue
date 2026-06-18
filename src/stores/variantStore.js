@@ -10,7 +10,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-
+import { API_BASE } from '../config.js'
 export const useVariantStore = defineStore('variant', () => {
 
   // --- Core State ---
@@ -205,7 +205,7 @@ export const useVariantStore = defineStore('variant', () => {
   }
 
   async function processChunk(rsIdList) {
-    const response = await fetch('http://172.16.48.59:5000/api/stream_analysis', {
+    const response = await fetch(`${API_BASE}/api/stream_analysis`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rs_id_list: rsIdList })
@@ -258,7 +258,7 @@ export const useVariantStore = defineStore('variant', () => {
     formData.append('query', query)
 
     try {
-      const response = await fetch('http://172.16.48.59:5000/api/agentic/analyze', {
+      const response = await fetch(`${API_BASE}/api/agentic/analyze`, {
         method: 'POST',
         body: formData
       })

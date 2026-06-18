@@ -70,11 +70,49 @@ const onFileSelect = (e) => {
   const file = e.target.files[0]
   processFile(file)
 }
-
-const loadExample = () => {
-  inputRaw.value = "rs123, rs456, rs6903203, rs429358"
-}
-
+// The list from your uploaded file
+const baseIds = [
+  "rs6903203", "rs6903208", "rs6903218", "rs6903235", "rs6903273",
+  "rs6903282", "rs6903293", "rs6903346", "rs6903353", "rs690336",
+  "rs9605145", "rs9605146", "rs9605183", "rs879577", "rs9306198",
+  "rs712952", "rs807459", "rs9610645", "rs738786", "rs8137247", "rs7292659"
+];
+const significantIds = [
+  "rs1800562", "rs738409", "rs174537", "rs1801198", "rs1800961",
+  "rs4148211", "rs6918586", "rs1042026", "rs1229984", "rs53576"
+];
+// const loadExample = () => {
+//   inputRaw.value = "rs123, rs456, rs6903203, rs429358"
+// }
+const loadExample = (count) => {
+  let result = [];
+  
+  if (count <= baseIds.length) {
+    // Just take the first N from your file
+    result = baseIds.slice(0, count);
+  } else {
+    // Start with all provided IDs
+    result = [...baseIds];
+    
+    // Add from the significant list first, then randoms if still needed
+    const needed = count - baseIds.length;
+    
+    // Add significant IDs
+    for (let i = 0; i < Math.min(needed, significantIds.length); i++) {
+      result.push(significantIds[i]);
+    }
+    
+    // Fill remaining with random if count > base + significant
+    if (needed > significantIds.length) {
+      for (let i = 0; i < (needed - significantIds.length); i++) {
+        result.push(`rs${Math.floor(Math.random() * 9000000) + 1000000}`);
+      }
+    }
+  }
+  
+  // This update should only happen once at the end
+  inputRaw.value = result.join(', ');
+};
 const handleAgenticSearch = async () => {
   if (!lastUploadedFile.value || !agenticQuery.value) {
     alert('Please upload a file AND enter a question')
@@ -131,9 +169,17 @@ const handleAgenticSearch = async () => {
           <label class="block text-sm font-medium text-slate-700">
             Paste Variant IDs
           </label>
-          <button @click="loadExample" class="text-xs text-gen-primary hover:text-indigo-700 font-medium">
+          <!-- <button @click="loadExample" class="text-xs text-gen-primary hover:text-indigo-700 font-medium">
             Load Example
-          </button>
+          </button> -->
+          <button 
+            v-for="count in [3, 10, 20, 50, 100]" 
+            :key="count"
+            @click="loadExample(count)"
+            class="text-xs text-gen-primary hover:text-indigo-700 font-medium px-1"
+    >
+          {{ count }}
+        </button>
         </div>
         
         <textarea 

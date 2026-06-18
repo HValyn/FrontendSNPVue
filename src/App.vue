@@ -1,45 +1,82 @@
-<script setup>
+<!-- <script setup>
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+
+const route  = useRoute()
+const router = useRouter()
+
+const isHome     = computed(() => route.path === '/')
+const isAgentic  = computed(() => route.path === '/agentic')
+const isLoggedIn = computed(() => sessionStorage.getItem('ibge_auth') === '1')
+
+const logout = () => {
+  sessionStorage.removeItem('ibge_auth')
+  router.push('/login')
+}
+</script> -->
+<script setup>
+import { ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
+const router = useRouter()
 
-// Simple active state check
-const isHome = computed(() => route.path === '/')
-const isAgentic = computed(() => route.path === '/agentic')
+// 1. Create a reactive reference for authentication
+const isLoggedIn = ref(sessionStorage.getItem('ibge_auth') === '1')
+
+// 2. Use router.afterEach to update the state on every navigation
+router.afterEach(() => {
+  isLoggedIn.value = sessionStorage.getItem('ibge_auth') === '1'
+})
+
+const isHome = (path) => route.path === path
+
+const logout = () => {
+  sessionStorage.removeItem('ibge_auth')
+  isLoggedIn.value = false // Explicitly update state
+  router.push('/login')
+}
 </script>
-
 <template>
   <div class="min-h-screen flex flex-col font-sans">
-    <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
+
+    <!-- Only show header/nav when logged in -->
+    <header v-if="isLoggedIn && route.path !== '/login'" class="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
       <div class="max-w-7xl mx-auto px-4">
-        <!-- Top Bar -->
         <div class="h-16 flex justify-between items-center">
+
+          <!-- Brand -->
           <div class="flex items-center gap-3">
             <span class="text-2xl animate-pulse">🧬</span>
             <h1 class="text-xl font-bold tracking-tight text-slate-100">IBGE Search</h1>
           </div>
-          
-          <!-- Navigation Tabs -->
-          <nav class="flex space-x-1">
-            <router-link 
-              to="/" 
-              class="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200"
-              :class="isHome ? 'bg-slate-800 text-white shadow-inner' : 'text-slate-400 hover:text-white hover:bg-slate-800'"
+
+          <!-- Right side: nav + logout -->
+          <div class="flex items-center gap-4">
+            <nav class="flex space-x-1">
+              <router-link
+                to="/"
+                class="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+                :class="isHome ? 'bg-slate-800 text-white shadow-inner' : 'text-slate-400 hover:text-white hover:bg-slate-800'"
+              >
+                Overview
+              </router-link>
+            </nav>
+
+            <!-- Logout -->
+            <button
+              @click="logout"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+              title="Sign out"
             >
-              Overview
-            </router-link>
-            <!-- <router-link 
-              to="/agentic" 
-              class="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2"
-              :class="isAgentic ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-300 hover:text-white hover:bg-slate-800'"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-                <path d="M10 2a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 2zM10 15a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 15zM2.75 10a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 012.75 10zM15 10a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 0115 10zM4.757 4.757a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.061-1.06a.75.75 0 010-1.061zM14.182 14.182a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.061-1.06a.75.75 0 010-1.061zM4.757 15.243a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 01-1.06-1.06l1.06-1.061a.75.75 0 011.061 0zM14.182 5.818a.75.75 0 010-1.06l1.061-1.061a.75.75 0 011.06 1.06l-1.06 1.061a.75.75 0 01-1.061 0z" />
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1"/>
               </svg>
-              Agentic View
-            </router-link> -->
-          </nav>
+              Sign out
+            </button>
+          </div>
+
         </div>
       </div>
     </header>
@@ -51,23 +88,17 @@ const isAgentic = computed(() => route.path === '/agentic')
         </transition>
       </router-view>
     </main>
-    
-    <footer class="bg-white border-t border-slate-200 py-6">
+
+    <footer v-if="isLoggedIn" class="bg-white border-t border-slate-200 py-6">
       <div class="max-w-7xl mx-auto px-4 text-center text-slate-500 text-sm">
-        &copy; 2023 IBGE Search Platform. v2.1 Agentic Enabled.
+        &copy; {{ new Date().getFullYear() }} IBGE Search Platform · AITeC, NCP
       </div>
     </footer>
+
   </div>
 </template>
 
 <style>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to       { opacity: 0; }
 </style>

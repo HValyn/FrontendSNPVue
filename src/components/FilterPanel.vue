@@ -1,4 +1,5 @@
 <script setup>
+import { API_BASE } from '../config.js'
 import { ref, computed } from 'vue'
 import { useVariantStore } from '../stores/variantStore'
 import {
@@ -43,7 +44,7 @@ const applyNaturalFilter = async () => {
   nlError.value = ''
 
   try {
-    const response = await fetch('http://localhost:5000/api/smart_filter', {
+    const response = await fetch(`${API_BASE}/api/smart_filter`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -116,7 +117,7 @@ const exportFiltered = async (format) => {
       ? filters.value.genes.split(',').map(g => g.trim()).filter(Boolean)
       : []
 
-    const response = await fetch('http://localhost:5000/api/export_filtered', {
+    const response = await fetch(`${API_BASE}/api/export_filtered`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
