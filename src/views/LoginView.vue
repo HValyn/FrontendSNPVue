@@ -12,6 +12,7 @@ const loading = ref(false)
 const VALID_USERS = [
   { username: 'ibge',  password: 'genomics2024' },
   { username: 'admin', password: 'ncp@AITeC'    },
+  { username: 'ds', password: '1234'        },
 ]
 
 const handleLogin = async () => {
