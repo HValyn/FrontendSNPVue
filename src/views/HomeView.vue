@@ -2,6 +2,7 @@
 import SearchInput from '../components/SearchInput.vue'
 import FilterPanel from '../components/FilterPanel.vue'
 import VariantTable from '../components/VariantTable.vue'
+import VizPanel from '../components/VizPanel.vue'
 import ChatAssistant from '../components/ChatAssistant.vue'
 </script>
 
@@ -23,6 +24,7 @@ import ChatAssistant from '../components/ChatAssistant.vue'
       <div class="lg:col-span-8 space-y-8">
         <SearchInput />
         <FilterPanel />
+        <VizPanel />
         <VariantTable />
       </div>
 
