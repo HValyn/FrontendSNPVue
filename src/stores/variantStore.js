@@ -54,13 +54,31 @@ export const useVariantStore = defineStore('variant', () => {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
+  // Mirrors the backend's get_max_maf fix: absence of frequency data is NOT
+  // evidence a variant is common (dbsnp_common_index.db only covers MAF>=1%
+  // variants) — return null so callers handle "unknown" explicitly instead
+  // of every unscored variant silently being treated as maximally common.
   function getMaxMaf(variant) {
     const common = variant.payload?.data?.common || {}
     const vals = Object.entries(common)
       .filter(([k]) => k.endsWith('_MAF') || k.startsWith('freq_'))
       .map(([, v]) => parseFloat(v))
       .filter(n => !isNaN(n))
-    return vals.length ? Math.max(...vals) : 1.0
+    return vals.length ? Math.max(...vals) : null
+  }
+
+  // Real ClinVar significance lives in functional.clinvar_clnsig (dbNSFP).
+  // functional.clinvar_clnsig combines terms with '/' (Pathogenic/Likely_pathogenic)
+  // and lists unrelated categories with '|' (Benign|other) — normalized here
+  // to underscore-free lowercase terms for matching against filter checkboxes.
+  function getClinicalSignificance(variant) {
+    const raw = variant.payload?.data?.functional?.clinvar_clnsig
+    return raw || null
+  }
+  function clinvarTerms(rawSig) {
+    if (!rawSig) return []
+    return rawSig.replace(/_/g, ' ').split('|').flatMap(chunk => chunk.split('/'))
+      .map(t => t.trim().toLowerCase()).filter(Boolean)
   }
 
   // ── Actions ────────────────────────────────────────────────────────────────
@@ -99,13 +117,10 @@ export const useVariantStore = defineStore('variant', () => {
 
     let result = [...variants.value]
 
-    // Clinical significance
+    // Clinical significance (real ClinVar classification, not the ucscNotes QC flag)
     if (filters.clinical_significance?.length > 0) {
       const sigs = filters.clinical_significance.map(s => s.toLowerCase())
-      result = result.filter(v => {
-        const sig = (v.payload?.data?.clinvar?.ucscNotes || '').toLowerCase()
-        return sigs.some(s => sig.includes(s))
-      })
+      result = result.filter(v => sigs.some(s => clinvarTerms(getClinicalSignificance(v)).includes(s)))
     }
 
     // Missing databases
@@ -124,11 +139,15 @@ export const useVariantStore = defineStore('variant', () => {
       })
     }
 
-    // MAF threshold (upper bound)
+    // MAF threshold (upper bound) — unknown MAF is excluded rather than
+    // silently treated as either "passes" or "fails"; see getMaxMaf's docstring.
     if (filters.maf_threshold !== null && filters.maf_threshold !== undefined) {
       const threshold = parseFloat(filters.maf_threshold)
       if (!isNaN(threshold)) {
-        result = result.filter(v => getMaxMaf(v) < threshold)
+        result = result.filter(v => {
+          const maf = getMaxMaf(v)
+          return maf !== null && maf < threshold
+        })
       }
     }
 
@@ -168,8 +187,8 @@ export const useVariantStore = defineStore('variant', () => {
     chatContexts.value.all.variants = variants.value
 
     chatContexts.value.pathogenic.variants = variants.value.filter(v => {
-      const sig = (v.payload?.data?.clinvar?.ucscNotes || '').toLowerCase()
-      return sig.includes('pathogenic') && !sig.includes('benign')
+      const terms = clinvarTerms(getClinicalSignificance(v))
+      return terms.some(t => t.includes('pathogenic') && !t.includes('benign'))
     })
 
     chatContexts.value.missing.variants = variants.value.filter(v =>
@@ -300,6 +319,9 @@ export const useVariantStore = defineStore('variant', () => {
     clearFilters,
     clearResults,
     updateChatContexts,
-    performAgenticSearch
+    performAgenticSearch,
+    getMaxMaf,
+    getClinicalSignificance,
+    clinvarTerms
   }
 })

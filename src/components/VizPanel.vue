@@ -1,10 +1,12 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useVariantStore } from '../stores/variantStore'
+import { useVariantDetailStore } from '../stores/variantDetailStore'
 import { API_BASE } from '../config.js'
 import { ChartBarIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
 
 const store = useVariantStore()
+const detailStore = useVariantDetailStore()
 const vizData = ref(null)
 const loading = ref(false)
 const error   = ref('')
@@ -150,6 +152,15 @@ const SIG_LEGEND = [
 const manhattanPoints = computed(() => vizData.value?.manhattan_data || [])
 const rarityPoints    = computed(() => vizData.value?.rarity_impact_data || [])
 const leaderboardRows = computed(() => vizData.value?.leaderboard || [])
+
+// VizPanel's leaderboard rows are the reduced viz_data summary; the full
+// nested variant (needed for the drawer's richer detail — genes, all
+// frequencies, raw transcripts) is already sitting in store.variants, so no
+// extra fetch is needed here, just a lookup by rsid.
+function openLeaderboardRow(row) {
+  const full = store.variants.find(v => v.rsid === row.rsid)
+  if (full) detailStore.openLookup(full)
+}
 
 const manhattanCanvas = ref(null)
 const rarityCanvas    = ref(null)
@@ -378,7 +389,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', onResize))
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in leaderboardRows" :key="row.rsid" class="border-t border-slate-100">
+                <tr v-for="row in leaderboardRows" :key="row.rsid" class="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" @click="openLeaderboardRow(row)">
                   <td class="py-2 px-3 text-indigo-600 font-medium">{{ row.rsid }}</td>
                   <td class="py-2 px-3 text-slate-700">{{ row.gene || '—' }}</td>
                   <td class="py-2 px-3 text-slate-500">{{ row.chrom }}:{{ row.pos?.toLocaleString() || '—' }}</td>

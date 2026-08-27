@@ -1,7 +1,14 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView    from '../views/HomeView.vue'
-import AgenticView from '../views/AgenticView.vue'
-import LoginView   from '../views/LoginView.vue'
+import HomeView        from '../views/HomeView.vue'
+import LoginView       from '../views/LoginView.vue'
+import BatchReportView from '../views/BatchReportView.vue'
+// AgenticView is intentionally NOT imported/routed here — see the note in
+// src/views/AgenticView.vue. It's an incomplete prototype (empty gene/context
+// fields, results not useful) that predates the ClinVar/scoring fixes made
+// throughout this codebase. Batch Report (below) covers its intended use
+// case — "I have a big rsID/variant list, tell me what matters" — using the
+// corrected pipeline. The file is kept for reference, not deleted, in case
+// something in it is worth salvaging later.
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -18,9 +25,9 @@ const router = createRouter({
       component: HomeView
     },
     {
-      path: '/agentic',
-      name: 'agentic',
-      component: AgenticView
+      path: '/batch-report',
+      name: 'batch-report',
+      component: BatchReportView
     }
   ]
 })

@@ -1,9 +1,9 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useVariantStore } from '../stores/variantStore'
+import { useVariantDetailStore } from '../stores/variantDetailStore'
+import { API_BASE } from '../config.js'
 import {
-  ChevronDownIcon,
-  ChevronUpIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   CheckCircleIcon,
@@ -12,31 +12,54 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const store = useVariantStore()
-const expandedRows = ref(new Set())
+const detailStore = useVariantDetailStore()
+
+// Priority scores, keyed by rsid. Sourced from the same /api/viz_data
+// endpoint VizPanel uses (which computes them server-side via
+// variant_scoring.py) — fetched here too, separately, rather than
+// duplicating the scoring formula in JS. A future refactor could lift this
+// into the store so both components share one fetch; kept local for now to
+// avoid touching VizPanel's already-tested fetch logic.
+const priorityByRsid = ref({})
+async function fetchPriorityScores() {
+  if (store.variants.length === 0) { priorityByRsid.value = {}; return }
+  try {
+    const resp = await fetch(`${API_BASE}/api/viz_data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ variants: store.variants })
+    })
+    const data = await resp.json()
+    const map = {}
+    for (const row of (data.manhattan_data || [])) map[row.rsid] = row.priority
+    priorityByRsid.value = map
+  } catch (e) {
+    console.error('Failed to load priority scores for table:', e)
+  }
+}
+watch(() => store.loading, (isLoading) => {
+  if (!isLoading && store.variants.length > 0) fetchPriorityScores()
+})
 
 // --- Pagination ---
 const currentPage = ref(1)
 const pageSize = 50
-
-// KEY FIX: read filteredVariants, not variants
 const totalPages = computed(() => Math.ceil(store.filteredVariants.length / pageSize))
-
-// Reset to page 1 whenever the filtered list changes
 watch(() => store.filteredVariants.length, () => { currentPage.value = 1 })
-
 const paginatedVariants = computed(() => {
   const start = (currentPage.value - 1) * pageSize
   return store.filteredVariants.slice(start, start + pageSize)
 })
-
 const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++ }
 const prevPage = () => { if (currentPage.value > 1) currentPage.value-- }
 
-// --- Row helpers ---
-const toggleRow = (rsid) => {
-  if (expandedRows.value.has(rsid)) expandedRows.value.delete(rsid)
-  else expandedRows.value.add(rsid)
-}
+// Click a row to open the shared detail drawer — same component/behavior as
+// the leaderboard views elsewhere, so there's one consistent way to drill
+// into a variant regardless of which screen you're on. Replaces the old
+// inline-expand row (which duplicated significance/functional-score display
+// logic that now lives once in variantDetailAdapters.js + VariantDetail.vue,
+// and had the raw-multi-transcript overflow bug that logic fixes).
+const openDetail = (item) => detailStore.openLookup(item)
 
 const getClinVarColor = (sig) => {
   if (!sig) return 'bg-slate-100 text-slate-600'
@@ -46,14 +69,10 @@ const getClinVarColor = (sig) => {
   return 'bg-yellow-100 text-yellow-800'
 }
 
-const getFrequencyData = (commonData) => {
-  if (!commonData) return {}
-  return Object.fromEntries(
-    Object.entries(commonData).filter(([k, v]) =>
-      (k.endsWith('_MAF') || k.startsWith('freq_')) && v !== null
-    )
-  )
-}
+const priorityBadgeClass = (score) =>
+  score >= 70 ? 'bg-red-100 text-red-800'
+  : score >= 40 ? 'bg-orange-100 text-orange-800'
+  : 'bg-slate-100 text-slate-600'
 
 const getMissingDatabases = (sourcesFound) => {
   return ['dbSNP', 'ClinVar', 'dbNSFP'].filter(db => !sourcesFound?.includes(db))
@@ -124,90 +143,51 @@ const clearFilter = () => store.clearFilters()
         <table class="min-w-full divide-y divide-slate-200">
           <thead class="bg-slate-50">
             <tr>
-              <th class="w-10 px-6 py-3"></th>
               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Variant</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Location</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Clinical Sig</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase">Priority</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Database Coverage</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-slate-200">
-            <template v-for="item in paginatedVariants" :key="item.rsid">
-
-              <tr class="hover:bg-slate-50 transition-colors cursor-pointer" @click="toggleRow(item.rsid)">
-                <td class="px-6 py-4">
-                  <component :is="expandedRows.has(item.rsid) ? ChevronUpIcon : ChevronDownIcon" class="h-4 w-4 text-slate-400" />
-                </td>
-                <td class="px-6 py-4 font-medium text-gen-primary">{{ item.rsid }}</td>
-                <td class="px-6 py-4 text-slate-600 font-mono text-xs">
-                  <span v-if="item.payload?.data?.common">
-                    {{ item.payload.data.common.chrom }}:{{ item.payload.data.common.chromStart }}
+            <tr v-for="item in paginatedVariants" :key="item.rsid"
+              class="hover:bg-slate-50 transition-colors cursor-pointer" @click="openDetail(item)">
+              <td class="px-6 py-4 font-medium text-gen-primary">{{ item.rsid }}</td>
+              <td class="px-6 py-4 text-slate-600 font-mono text-xs">
+                <span v-if="item.payload?.data?.common">
+                  {{ item.payload.data.common.chrom }}:{{ (item.payload.data.common.chromStart + 1).toLocaleString() }}
+                </span>
+              </td>
+              <td class="px-6 py-4">
+                <span
+                  v-if="store.getClinicalSignificance(item)"
+                  :class="[getClinVarColor(store.getClinicalSignificance(item)), 'px-2 py-1 rounded-full text-xs font-medium']"
+                >
+                  {{ store.getClinicalSignificance(item).replace(/_/g, ' ') }}
+                </span>
+                <span v-else class="text-slate-400 text-xs">—</span>
+              </td>
+              <td class="px-6 py-4 text-right">
+                <span v-if="priorityByRsid[item.rsid] !== undefined"
+                  :class="[priorityBadgeClass(priorityByRsid[item.rsid]), 'inline-block px-2 py-0.5 rounded text-xs font-semibold']">
+                  {{ priorityByRsid[item.rsid] }}
+                </span>
+                <span v-else class="text-slate-300 text-xs">—</span>
+              </td>
+              <td class="px-6 py-4">
+                <div class="flex flex-wrap gap-1">
+                  <span v-for="src in item.payload?.sources_found" :key="src"
+                    class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs border border-green-300 flex items-center gap-1">
+                    <CheckCircleIcon class="h-3 w-3" />{{ src }}
                   </span>
-                </td>
-                <td class="px-6 py-4">
-                  <span
-                    v-if="item.payload?.data?.clinvar"
-                    :class="[getClinVarColor(item.payload.data.clinvar.ucscNotes), 'px-2 py-1 rounded-full text-xs font-medium']"
-                  >
-                    {{ item.payload.data.clinvar.ucscNotes }}
+                  <span v-for="db in getMissingDatabases(item.payload?.sources_found)" :key="db"
+                    class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs border border-red-300 flex items-center gap-1">
+                    <XMarkIcon class="h-3 w-3" />{{ db }}
                   </span>
-                  <span v-else class="text-slate-400 text-xs">—</span>
-                </td>
-                <td class="px-6 py-4">
-                  <div class="flex flex-wrap gap-1">
-                    <span v-for="src in item.payload?.sources_found" :key="src"
-                      class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs border border-green-300 flex items-center gap-1">
-                      <CheckCircleIcon class="h-3 w-3" />{{ src }}
-                    </span>
-                    <span v-for="db in getMissingDatabases(item.payload?.sources_found)" :key="db"
-                      class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs border border-red-300 flex items-center gap-1">
-                      <XMarkIcon class="h-3 w-3" />{{ db }}
-                    </span>
-                  </div>
-                </td>
-              </tr>
-
-              <!-- Expanded detail row -->
-              <tr v-if="expandedRows.has(item.rsid)" class="bg-slate-50">
-                <td colspan="5" class="px-8 py-6">
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                    <!-- Population frequencies -->
-                    <div v-if="item.payload?.data?.common">
-                      <h4 class="text-sm font-bold text-slate-900 mb-3">Population Frequencies (MAF)</h4>
-                      <div class="grid grid-cols-2 gap-2">
-                        <div v-for="(val, key) in getFrequencyData(item.payload.data.common)" :key="key"
-                          class="flex justify-between text-xs bg-white p-2 rounded border border-slate-200">
-                          <span class="text-slate-500">{{ key.replace('_MAF', '').replace('freq_', '') }}</span>
-                          <span class="font-mono font-medium">{{ val }}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Genes -->
-                    <div v-if="item.payload?.data?.genes?.length > 0">
-                      <h4 class="text-sm font-bold text-slate-900 mb-3">Associated Genes</h4>
-                      <div class="flex flex-wrap gap-2">
-                        <span v-for="gene in item.payload.data.genes" :key="gene"
-                          class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium">
-                          {{ gene }}
-                        </span>
-                      </div>
-                    </div>
-
-                    <!-- Functional predictions -->
-                    <div v-if="item.payload?.data?.functional" class="md:col-span-2">
-                      <h4 class="text-sm font-bold text-slate-900 mb-3">Functional Predictions</h4>
-                      <div class="bg-white p-4 rounded border border-slate-200">
-                        <pre class="text-xs text-slate-600 overflow-x-auto">{{ JSON.stringify(item.payload.data.functional, null, 2) }}</pre>
-                      </div>
-                    </div>
-
-                  </div>
-                </td>
-              </tr>
-
-            </template>
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>

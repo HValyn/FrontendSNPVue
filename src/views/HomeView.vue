@@ -21,7 +21,11 @@ import ChatAssistant from '../components/ChatAssistant.vue'
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
       
       <!-- Left Column: Search, Filter & Data (8/12 columns) -->
-      <div class="lg:col-span-8 space-y-8">
+      <!-- min-w-0 is required here: without it, a grid item won't shrink
+           below its content's intrinsic width, so wide tables (leaderboard,
+           main results table) overflow the grid track and get visually
+           clipped instead of triggering their own overflow-x-auto scroll. -->
+      <div class="lg:col-span-8 space-y-8 min-w-0">
         <SearchInput />
         <FilterPanel />
         <VizPanel />
@@ -29,7 +33,7 @@ import ChatAssistant from '../components/ChatAssistant.vue'
       </div>
 
       <!-- Right Column: AI Chat (4/12 columns) -->
-      <div class="lg:col-span-4">
+      <div class="lg:col-span-4 min-w-0">
         <ChatAssistant />
       </div>
 

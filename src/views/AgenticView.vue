@@ -1,3 +1,22 @@
+<!--
+  DEPRECATED / NOT ROUTED — kept for reference only.
+
+  This view predates the ClinVar/scoring fixes made throughout the rest of
+  this codebase: it has no priority scoring, returns empty "Context Summary"
+  and "Display Name" fields, and mislabels most variants "Intergenic"
+  (relies on the same broken gene-resolution path the rest of the app used
+  to have). It is no longer registered in src/router/index.js and has no
+  nav entry — not reachable in the running app.
+
+  Its intended use case — "upload a large rsID list, get back what matters"
+  — is now covered by BatchReportView.vue's rsID/CSV upload mode, which
+  uses the corrected DuckDB join + variant_scoring.py pipeline instead of
+  this view's backend endpoint (/api/agentic/analyze — see the matching
+  deprecation note there in unified_app_snp_gem34_v3.py).
+
+  Left in place rather than deleted in case anything here (e.g. the
+  drag-drop file UI pattern) is worth reusing later.
+-->
 <script setup>
 import { ref } from 'vue'
 import { useVariantStore } from '../stores/variantStore'

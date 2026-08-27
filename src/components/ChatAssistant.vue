@@ -56,28 +56,36 @@ const buildSmartContext = () => {
   const interestingVariants = []
 
   contextVariants.forEach(v => {
-    const clinvar    = v.payload?.data?.clinvar    || {}
     const functional = v.payload?.data?.functional || {}
-    const sig = clinvar.ucscNotes || 'Unknown'
+    // Real ClinVar significance lives in dbNSFP's clinvar_clnsig — the
+    // clinvar.ucscNotes field this used to read is a QC/track-membership
+    // flag (e.g. "clinvar,clinvarBenign,commonAll,"), never a classification.
+    const rawSig = functional.clinvar_clnsig
+    const sig = rawSig ? rawSig.replace(/_/g, ' ') : 'Unknown'
 
     clinvarCounts[sig] = (clinvarCounts[sig] || 0) + 1
-    const genes = v.payload?.data?.genes || []
+
+    // dbNSFP's genename is a real gene symbol; GENCODE's gene_id in this
+    // dataset is transcript-level (ENST...) and only used as a fallback.
+    const genes = functional.genename
+      ? [...new Set(functional.genename.split(';').map(g => g.trim()).filter(Boolean))]
+      : (v.payload?.data?.genes || [])
     genes.forEach(g => geneCounts[g] = (geneCounts[g] || 0) + 1)
 
-    const isPathogenic  = sig.toLowerCase().includes('pathogenic') && !sig.toLowerCase().includes('benign')
-    const hasFunctional = Object.keys(functional).length > 0
+    const sigLower = sig.toLowerCase()
+    const isPathogenic  = sigLower.includes('pathogenic') && !sigLower.includes('benign')
+    const hasFunctional = functional.CADD_phred || functional.REVEL_score || functional.AlphaMissense_score
 
     if ((isPathogenic || hasFunctional) && interestingVariants.length < 50) {
       interestingVariants.push({
         rsid: v.rsid, sig, genes,
-        clinvar_review_status:   clinvar.clinvar_review_status   ?? null,
-        phenotypes:              clinvar.phenotypes               ?? null,
-        CADD_phred:              functional.CADD_phred            ?? null,
-        SIFT_score:              functional.SIFT_score            ?? null,
-        Polyphen2_HVAR_score:    functional.Polyphen2_HVAR_score  ?? null,
-        fathmm_MKL_coding_score: functional.fathmm_MKL_coding_score ?? null,
-        maf_1000G:   v.payload?.data?.common?.freq_1000G_ALL  ?? null,
-        maf_gnomAD:  v.payload?.data?.common?.freq_gnomAD_ALL ?? null,
+        clinvar_review:        functional.clinvar_review ?? null,
+        clinvar_trait:         functional.clinvar_trait  ?? null,
+        CADD_phred:            functional.CADD_phred            ?? null,
+        SIFT_score:            functional.SIFT_score            ?? null,
+        REVEL_score:           functional.REVEL_score           ?? null,
+        AlphaMissense_pred:    functional.AlphaMissense_pred    ?? null,
+        maf: store.getMaxMaf(v),  // null = genuinely unknown, not "common"
       })
     }
   })

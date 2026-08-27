@@ -1,22 +1,7 @@
-<!-- <script setup>
-import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-
-const route  = useRoute()
-const router = useRouter()
-
-const isHome     = computed(() => route.path === '/')
-const isAgentic  = computed(() => route.path === '/agentic')
-const isLoggedIn = computed(() => sessionStorage.getItem('ibge_auth') === '1')
-
-const logout = () => {
-  sessionStorage.removeItem('ibge_auth')
-  router.push('/login')
-}
-</script> -->
 <script setup>
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import VariantDetail from './components/VariantDetail.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -57,9 +42,16 @@ const logout = () => {
               <router-link
                 to="/"
                 class="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200"
-                :class="isHome ? 'bg-slate-800 text-white shadow-inner' : 'text-slate-400 hover:text-white hover:bg-slate-800'"
+                :class="isHome('/') ? 'bg-slate-800 text-white shadow-inner' : 'text-slate-400 hover:text-white hover:bg-slate-800'"
               >
                 Overview
+              </router-link>
+              <router-link
+                to="/batch-report"
+                class="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+                :class="isHome('/batch-report') ? 'bg-slate-800 text-white shadow-inner' : 'text-slate-400 hover:text-white hover:bg-slate-800'"
+              >
+                Batch Report
               </router-link>
             </nav>
 
@@ -94,6 +86,8 @@ const logout = () => {
         &copy; {{ new Date().getFullYear() }} IBGE Search Platform · AITeC, NCP
       </div>
     </footer>
+
+    <VariantDetail />
 
   </div>
 </template>
